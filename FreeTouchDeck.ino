@@ -21,6 +21,7 @@
       - ESPAsyncWebserver (latest version) download from: https://github.com/me-no-dev/ESPAsyncWebServer
       - AsyncTCP (latest version) download from: https://github.com/me-no-dev/AsyncTCP
       - ArduinoJson (tested with version 6.17.3), available through Library Manager
+      - TFT_eTouch (needed for ESP32-2432S028 du to double SPI)
 
       --- If you use Capacitive touch (ESP32 TouchDown) ---
       - Dustin Watts FT6236 Library (version 1.0.2), https://github.com/DustinWatts/FT6236
@@ -41,7 +42,7 @@
 // ------- Uncomment the next line if you use capacitive touch -------
 // (The ESP32 TOUCHDOWN and the ESP32 TouchDown S3 uses this!)
 //#define USECAPTOUCH
-
+#define TOUCH
 //#define ESP32TouchDownS3
 
 // ------- If your board is capapble of USB HID you can uncomment this -
@@ -88,7 +89,26 @@ const char *versionnumber = "0.9.18a";
   
 #include <Preferences.h> // Used to store states before sleep/reboot
 
-#include <TFT_eSPI.h> // The TFT_eSPI library
+
+#include <TFT_eTouch.h> // Second libe to define second SPI
+#include <TFT_eSPI.h>
+#include <User_Setup.h> 
+
+
+// TFT display defines are in the TFT_eSPI UserSetup.h
+
+//defines related to ESP32 Smart Display
+//--------- TFT_eTouch defines --------
+// pins used by ESP32-2432S028 display touch controller
+#define ETOUCH_MOSI 32
+#define ETOUCH_MISO 39
+#define ETOUCH_SCK 25
+#define ETOUCH_CS 33
+#define ETOUCH_IRQ 0xff // not used in this sketch
+//
+//---- TFT defines not defined in TFT_eSPI.h : User_Setup.h
+#define SCREEN_ROTATION 1
+#define TFT_BL 21
 
 #if defined(USEUSBHID)
 
@@ -131,7 +151,7 @@ const char *versionnumber = "0.9.18a";
 #include <ArduinoJson.h> // Using ArduinoJson to read and write config files
 
 #include <WiFi.h> // Wifi support
-
+#include <SPI.h>
 #include <AsyncTCP.h>          //Async Webserver support header
 #include <ESPAsyncWebServer.h> //Async Webserver support header
 
@@ -145,7 +165,9 @@ const char *versionnumber = "0.9.18a";
 
 AsyncWebServer webserver(80);
 
-TFT_eSPI tft = TFT_eSPI();
+SPIClass hSPI(HSPI);//define SPI port to be used by TFT_eTouch
+TFT_eSPI tft; // TFT_eSPI instance
+TFT_eTouch<TFT_eSPI> touch(tft, ETOUCH_CS, ETOUCH_IRQ, hSPI);
 
 Preferences savedStates;
 
@@ -160,8 +182,8 @@ Preferences savedStates;
 #define REPEAT_CAL false
 
 // Set the width and height of your screen here:
-#define SCREEN_WIDTH 480
-#define SCREEN_HEIGHT 320
+#define SCREEN_WIDTH 320
+#define SCREEN_HEIGHT 240
 
 // Keypad start position, centre of the first button
 #define KEY_X SCREEN_WIDTH / 6
@@ -372,7 +394,9 @@ void setup()
   // --------------- Init Display -------------------------
 
   // Initialise the TFT screen
-  tft.init();
+  hSPI.begin(ETOUCH_SCK, ETOUCH_MISO, ETOUCH_MOSI, ETOUCH_CS);// Touch controller pins
+  tft.begin();
+  touch.init();
 
   // Set the rotation before we calibrate
   tft.setRotation(1);
@@ -441,7 +465,9 @@ void setup()
 // Calibrate the touch screen and retrieve the scaling factors
 #ifndef USECAPTOUCH
   Serial.println("[INFO]: Waiting for touch calibration...");
-  touch_calibrate();
+  TFT_eTouchBase::Calibation calibation = { 233, 3785, 3731, 120, 2 };
+  touch.setCalibration(calibation);
+
   Serial.println("[INFO]: Touch calibration completed!");
 #endif // !defined(USECAPTOUCH)
 
@@ -735,7 +761,7 @@ void loop(void)
   
   if (pageNum == 7)
   {
-      uint16_t t_x = 0, t_y = 0;
+      int16_t t_x = 0, t_y = 0;
       boolean pressed = false;
 
     // If pageNum = 7, we are in STA or AP mode.
@@ -756,8 +782,8 @@ void loop(void)
     }
 
 #else
-
-    pressed = tft.getTouch(&t_x, &t_y);
+    
+    pressed = touch.getXY(t_x, t_y);
 
 #endif // defined(USECAPTOUCH)
 
@@ -784,7 +810,7 @@ void loop(void)
       printinfo();
     }
 
-    uint16_t t_x = 0, t_y = 0;
+    int16_t t_x = 0, t_y = 0;
 
     //At the beginning of a new loop, make sure we do not use last loop's touch.
     boolean pressed = false;
@@ -806,7 +832,7 @@ void loop(void)
 
 #else
 
-    pressed = tft.getTouch(&t_x, &t_y);
+    pressed = touch.getXY(t_x, t_y);
 
 #endif // defined(USECAPTOUCH)
 
@@ -822,7 +848,7 @@ void loop(void)
   {
 
     // We were unable to connect to WiFi. Waiting for touch to get back to the settings menu.
-    uint16_t t_x = 0, t_y = 0;
+    int16_t t_x = 0, t_y = 0;
 
     //At the beginning of a new loop, make sure we do not use last loop's touch.
     boolean pressed = false;
@@ -844,7 +870,7 @@ void loop(void)
 
 #else
 
-    pressed = tft.getTouch(&t_x, &t_y);
+    pressed = touch.getXY(t_x, t_y);
 
 #endif // defined(USECAPTOUCH)
 
@@ -861,7 +887,7 @@ void loop(void)
   {
 
     // A JSON file failed to load. We are drawing an error message. And waiting for a touch.
-    uint16_t t_x = 0, t_y = 0;
+    int16_t t_x = 0, t_y = 0;
 
     //At the beginning of a new loop, make sure we do not use last loop's touch.
     boolean pressed = false;
@@ -883,7 +909,7 @@ void loop(void)
 
 #else
 
-    pressed = tft.getTouch(&t_x, &t_y);
+    pressed = touch.getXY(t_x, t_y); 
 
 #endif // defined(USECAPTOUCH)
 
@@ -949,7 +975,7 @@ void loop(void)
 #endif // defined(touchInterruptPin)
 
     // Touch coordinates are stored here
-    uint16_t t_x = 0, t_y = 0;
+    int16_t t_x = 0, t_y = 0;
 
     //At the beginning of a new loop, make sure we do not use last loop's touch.
     boolean pressed = false;
@@ -971,7 +997,7 @@ void loop(void)
 
 #else
 
-    pressed = tft.getTouch(&t_x, &t_y);
+    pressed = touch.getXY(t_x, t_y);
 
 #endif // defined(USECAPTOUCH)
 

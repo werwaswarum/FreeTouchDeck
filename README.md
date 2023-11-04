@@ -8,6 +8,7 @@
 [![](https://img.shields.io/twitter/follow/DustinWattsNL)](https://twitter.com/DustinWattsNL)
 
 
+Fork to support ESP32-2432S028 Boards, for this fork the Readme was only partial edited.
 
 For interfacing with Windows/macOS/Linux using an ESP32, a touchscreen and BLE. 
 
@@ -77,6 +78,7 @@ I will also point you to my Discord (https://discord.gg/RE3XevS) Where these peo
 - ESPAsyncWebserver (latest version) download from: https://github.com/me-no-dev/ESPAsyncWebServer
 - AsyncTCP (latest version) download from: https://github.com/me-no-dev/AsyncTCP
 - ArduinoJson (tested with version 6.17.3), available through Library Manager
+- TFT_eTouch (needed for ESP32-2432S028 due to double SPI)
 
 If you use capacitive touch:
 - Dustin Watts FT6236 Library (version 1.0.2), https://github.com/DustinWatts/FT6236
